@@ -10,7 +10,7 @@ from langchain_community.embeddings import AzureOpenAIEmbeddings
 
 # Load environment variables
 load_dotenv(find_dotenv())
-
+st.set_page_config(page_title='DinimAi', page_icon='📚')
 # Initialize embeddings and LLM with Azure and OpenAI settings
 embeddings = AzureOpenAIEmbeddings(
     azure_deployment=os.environ.get('AZURE_EMBEDDING_DEPLOYMENT'),
