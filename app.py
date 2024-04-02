@@ -101,6 +101,7 @@ if uploaded_file is not None:
         st.session_state.retriever = retriever
         st.session_state.uploaded_file = uploaded_file
         st.session_state.llm_ready = True
+        st.session_state.show_initial_message = False
     else:
         st.sidebar.error('Failed to process document.')
 
@@ -111,9 +112,15 @@ for item in st.session_state.chat_history:
     elif role == "assistant":
         st.chat_message("assistant").markdown(content)
 
-st.chat_message("assistant").markdown("שלום שמי דין נוצרתי כדי לקרוא מסמכים ארוכים ללמוד אותם ולענות לכם על שאלות עליהם. "
-                                      "\n"
-                                      "תעלו אליי מסמכים כדי שאלמד אותם ואוכל לעזור לכם בעבודה היומיומית.")
+if "show_initial_message" not in st.session_state:
+    st.session_state.show_initial_message = True
+
+# Display initial chat message if session state variable is True
+if st.session_state.show_initial_message:
+    st.chat_message("assistant").markdown("שלום שמי דין נוצרתי כדי לקרוא מסמכים ארוכים ללמוד אותם ולענות לכם על שאלות עליהם. "
+                                  "\n"
+                                  "תעלו אליי מסמכים כדי שאלמד אותם ואוכל לעזור לכם בעבודה היומיומית.")
+
 
 # Chat interface
 if prompt is not None:
