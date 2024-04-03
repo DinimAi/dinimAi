@@ -112,7 +112,6 @@ requests-oauthlib==2.0.0
 rich==13.7.1
 rpds-py==0.18.0
 rsa==4.9
-s3transfer==0.10.1
 semver==3.0.2
 shellingham==1.5.4
 six==1.16.0
