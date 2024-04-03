@@ -40,6 +40,8 @@ claude_llm = ChatAnthropic(
 memory = ConversationBufferMemory(memory_key="chat_history", input_key='question', output_key='answer',
                                   return_messages=True)
 
+fast_question_buttons = ["אני הולך לייצג את הנתבע במסמך תכין אותי לדיון איתו", "הכן לי תמצית של המסמך המצורף", "מי התובע ומי הנתבע?"]
+
 
 # Function to parse PDF content
 def parse_pdf(uploaded_file):
@@ -48,35 +50,6 @@ def parse_pdf(uploaded_file):
     for page in reader.pages:
         text += page.extract_text() + '\n'
     return text  # Returns the concatenated text of all pages
-
-
-# Function to process the uploaded file and prepare the retriever
-@st.cache_resource
-def process_uploaded_file(uploaded_file):
-    if uploaded_file is not None:
-        print("Processing uploaded file")
-        document_text = parse_pdf(uploaded_file)
-        documents = [document_text]
-        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-        texts = text_splitter.create_documents(documents)
-
-        db = Chroma.from_documents(texts, embeddings)
-        st.session_state["chat_history"] = []
-        st.sidebar.success('המסמך נטען בהצלחה!')
-        st.chat_message("assistant").markdown("קראתי את המסמך! אתה יכול לשאול אותי שאלות עכשיו")
-        return db.as_retriever()
-    return None
-
-
-# Custom HTML and CSS for an RTL info box
-def custom_info(text):
-    info_box = f"""
-    <div style="direction: rtl; text-align: right; border-left: 5px solid #26c6da; padding: 10px; border-radius: 5px;">
-        {text}
-    </div>
-    """
-    st.markdown(info_box, unsafe_allow_html=True)
-
 
 def generate_response(query_text, retriever):
     print(f"Generating response to - {query_text}")
@@ -94,6 +67,41 @@ def generate_response(query_text, retriever):
 
 if "chat_history" not in st.session_state:
     st.session_state["chat_history"] = []
+for item in st.session_state.chat_history:
+    role, content = item["role"], item["content"]
+    if role == "user":
+        st.chat_message("user").markdown(content)
+    elif role == "assistant":
+        st.chat_message("assistant").markdown(content)
+
+
+@st.cache_resource
+def process_uploaded_file(uploaded_file):
+    if uploaded_file is not None:
+        print("Processing uploaded file")
+        document_text = parse_pdf(uploaded_file)
+        documents = [document_text]
+        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+        texts = text_splitter.create_documents(documents)
+
+        db = Chroma.from_documents(texts, embeddings)
+        st.session_state["chat_history"] = []
+        st.sidebar.success('המסמך נטען בהצלחה!')
+        st.chat_message("assistant").markdown("קראתי את המסמך! אתה יכול לשאול אותי שאלות עכשיו")
+        return db.as_retriever()
+    return None
+
+def check_and_handle_fast_question():
+    # Check if there's a fast question in the session state
+    if "fast_question" in st.session_state and st.session_state["fast_question"]:
+        fast_question = st.session_state["fast_question"]
+        st.session_state["fast_question"] = ""
+        return fast_question
+    return None
+
+prompt = st.chat_input("הכנס שאילתה על המסמך")
+
+
 st.markdown("""
     <style>
     /* Custom CSS for RTL alignment */
@@ -118,7 +126,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 st.sidebar.image("logo.png", width=250)
 uploaded_file = st.sidebar.file_uploader("Upload your PDF File", type="pdf", label_visibility="hidden")
-prompt = st.chat_input("הכנס שאילתה על המסמך")
 # Sidebar for file upload
 if uploaded_file is not None:
     retriever = process_uploaded_file(uploaded_file)
@@ -127,15 +134,15 @@ if uploaded_file is not None:
         st.session_state.uploaded_file = uploaded_file
         st.session_state.llm_ready = True
         st.session_state.show_initial_message = False
+        cols = st.columns(len(fast_question_buttons))
+        for idx, col in enumerate(cols):
+            fast_question = fast_question_buttons[idx]
+            with col:
+                if st.button(fast_question):
+                    st.session_state["fast_question"] = fast_question
+                    # st.experimental_rerun()
     else:
         st.sidebar.error('Failed to process document.')
-
-for item in st.session_state.chat_history:
-    role, content = item["role"], item["content"]
-    if role == "user":
-        st.chat_message("user").markdown(content)
-    elif role == "assistant":
-        st.chat_message("assistant").markdown(content)
 
 if "show_initial_message" not in st.session_state:
     st.session_state.show_initial_message = True
@@ -163,3 +170,15 @@ if prompt is not None:
             response = generate_response(prompt, st.session_state.retriever)
             tmp.markdown(response)
             st.session_state.chat_history.append({"role": "assistant", "content": response})
+
+# Attempt to handle a fast question if one has been set
+fast_question = check_and_handle_fast_question()
+if fast_question:
+    prompt = fast_question
+    # You can also programmatically display the fast question in the chat interface here
+    st.chat_message("user").markdown(prompt)
+    tmp = st.markdown(f"אני חושב וכבר מחזיר לך תשובה...")
+    response = generate_response(prompt, st.session_state.retriever)
+    tmp.markdown(response)
+    st.session_state.chat_history.append({"role": "assistant", "content": response})
+
