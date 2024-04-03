@@ -3,10 +3,15 @@ import streamlit as st
 from dotenv import load_dotenv, find_dotenv
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores import Chroma
-from langchain.chains import RetrievalQA
+from langchain.memory import ConversationBufferMemory
 from PyPDF2 import PdfReader
+from langchain.prompts import PromptTemplate
 from langchain_community.chat_models import AzureChatOpenAI
+from langchain_anthropic import ChatAnthropic
 from langchain_community.embeddings import AzureOpenAIEmbeddings
+from langchain.chains import ConversationalRetrievalChain
+
+from genai.prompt import CHAIN_TEMPLATE
 
 # Load environment variables
 load_dotenv(find_dotenv())
@@ -26,6 +31,16 @@ llm = AzureChatOpenAI(
     max_tokens=4096
 )
 
+claude_llm = ChatAnthropic(
+    anthropic_api_key=os.environ.get('ANTHROPIC_API_KEY'),
+    temperature=0, model_name="claude-3-opus-20240229",
+    streaming=True
+)
+
+memory = ConversationBufferMemory(memory_key="chat_history", input_key='question', output_key='answer',
+                                  return_messages=True)
+
+
 # Function to parse PDF content
 def parse_pdf(uploaded_file):
     reader = PdfReader(uploaded_file)
@@ -34,6 +49,7 @@ def parse_pdf(uploaded_file):
         text += page.extract_text() + '\n'
     return text  # Returns the concatenated text of all pages
 
+
 # Function to process the uploaded file and prepare the retriever
 @st.cache_resource
 def process_uploaded_file(uploaded_file):
@@ -41,7 +57,7 @@ def process_uploaded_file(uploaded_file):
         print("Processing uploaded file")
         document_text = parse_pdf(uploaded_file)
         documents = [document_text]
-        text_splitter = CharacterTextSplitter(chunk_size=100, chunk_overlap=0)
+        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
         texts = text_splitter.create_documents(documents)
 
         db = Chroma.from_documents(texts, embeddings)
@@ -50,6 +66,7 @@ def process_uploaded_file(uploaded_file):
         st.chat_message("assistant").markdown("קראתי את המסמך! אתה יכול לשאול אותי שאלות עכשיו")
         return db.as_retriever()
     return None
+
 
 # Custom HTML and CSS for an RTL info box
 def custom_info(text):
@@ -62,9 +79,17 @@ def custom_info(text):
 
 
 def generate_response(query_text, retriever):
-    print("Generating response")
-    qa = RetrievalQA.from_chain_type(llm=llm, chain_type='stuff', retriever=retriever)
-    return qa.run(query_text)
+    print(f"Generating response to - {query_text}")
+    chain = ConversationalRetrievalChain.from_llm(
+        llm=claude_llm,
+        memory=memory,
+        return_generated_question=True,
+        retriever=retriever,
+        condense_question_prompt=PromptTemplate.from_template(CHAIN_TEMPLATE),
+    )
+    chain_response = chain({"question": query_text})
+
+    return chain_response["answer"]
 
 
 if "chat_history" not in st.session_state:
@@ -117,10 +142,10 @@ if "show_initial_message" not in st.session_state:
 
 # Display initial chat message if session state variable is True
 if st.session_state.show_initial_message:
-    st.chat_message("assistant").markdown("שלום שמי דין נוצרתי כדי לקרוא מסמכים ארוכים ללמוד אותם ולענות לכם על שאלות עליהם. "
-                                  "\n"
-                                  "תעלו אליי מסמכים כדי שאלמד אותם ואוכל לעזור לכם בעבודה היומיומית.")
-
+    st.chat_message("assistant").markdown(
+        "שלום שמי דין נוצרתי כדי לקרוא מסמכים ארוכים ללמוד אותם ולענות לכם על שאלות עליהם. "
+        "\n"
+        "תעלו אליי מסמכים כדי שאלמד אותם ואוכל לעזור לכם בעבודה היומיומית.")
 
 # Chat interface
 if prompt is not None:
@@ -128,7 +153,7 @@ if prompt is not None:
     st.session_state.chat_history.append({"role": "user", "content": prompt})
 
     if not st.session_state.get('llm_ready', False):
-        response = "Please upload the file and configure the LLM well first"
+        response = "אנא הכנס מסמך כדי שאוכל לעזור לך."
         with st.chat_message("assistant"):
             st.markdown(response)
         st.session_state.chat_history.append({"role": "assistant", "content": response})
@@ -138,5 +163,3 @@ if prompt is not None:
             response = generate_response(prompt, st.session_state.retriever)
             tmp.markdown(response)
             st.session_state.chat_history.append({"role": "assistant", "content": response})
-
-
