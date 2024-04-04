@@ -96,12 +96,15 @@ def parse_pdf(uploaded_file):
 # Function to generate response using the ConversationalRetrievalChain
 def generate_response(query_text, retriever):
     print(f"Generating response to - {query_text}")
+    prompt = PromptTemplate(
+        template=CHAIN_TEMPLATE,
+        input_variables=["context", "chat_history", "question"])
     chain = ConversationalRetrievalChain.from_llm(
         llm=llm,
         memory=memory,
+        combine_docs_chain_kwargs={"prompt": prompt},
         return_generated_question=True,
         retriever=retriever,
-        condense_question_prompt=PromptTemplate.from_template(CHAIN_TEMPLATE),
     )
     return chain({"question": query_text})["answer"]
 
@@ -118,7 +121,7 @@ def process_uploaded_file(uploaded_file, session_uuid):
         db = Chroma.from_documents(texts, embeddings)
         st.sidebar.success('המסמך נטען בהצלחה!')
         st.session_state["chat_history"] = []
-        return db.as_retriever()
+        return db.as_retriever(search_kwargs={"k": 2})
 
     return None
 
