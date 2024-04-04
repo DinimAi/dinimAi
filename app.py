@@ -1,6 +1,6 @@
 import os
 import uuid
-
+import hmac
 from dotenv import load_dotenv, find_dotenv
 import streamlit as st
 from PyPDF2 import PdfReader
@@ -52,8 +52,34 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+def check_password():
+    """Returns `True` if the user had the correct password."""
 
-# Initialize embeddings and LLM with Azure and OpenAI settings
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        if hmac.compare_digest(st.session_state["password"], st.secrets["password"]):
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Don't store the password.
+        else:
+            st.session_state["password_correct"] = False
+
+    # Return True if the password is validated.
+    if st.session_state.get("password_correct", False):
+        return True
+
+    # Show input for password.
+    st.text_input(
+        "Password", type="password", on_change=password_entered, key="password"
+    )
+    if "password_correct" in st.session_state:
+        st.error("😕 Password incorrect")
+    return False
+
+
+if not check_password():
+    st.stop()
+
+
 def initialize_embeddings_and_llm():
     return AzureOpenAIEmbeddings(
         azure_deployment=os.getenv('AZURE_EMBEDDING_DEPLOYMENT'),
