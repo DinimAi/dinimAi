@@ -100,7 +100,7 @@ def generate_response(query_text, retriever):
         template=CHAIN_TEMPLATE,
         input_variables=["context", "chat_history", "question"])
     chain = ConversationalRetrievalChain.from_llm(
-        llm=llm,
+        llm=claude_llm,
         memory=memory,
         combine_docs_chain_kwargs={"prompt": prompt},
         return_generated_question=True,
