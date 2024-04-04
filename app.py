@@ -112,25 +112,23 @@ def generate_response(query_text, retriever):
 # Function to process uploaded PDF file
 def process_uploaded_file(uploaded_file, session_uuid):
     if uploaded_file:
-        # You might want to use uploaded_file.name or uploaded_file.size or a combination of attributes
-        file_identifier = uploaded_file.name
+        try:
+            file_identifier = uploaded_file.name
+            if "uploaded_file_identifier" not in st.session_state or st.session_state.uploaded_file_identifier != file_identifier:
+                print(f"Processing uploaded file {session_uuid}")
+                document_text = parse_pdf(uploaded_file)
+                text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+                texts = text_splitter.create_documents([document_text])
 
-        # Check if the file has changed based on the identifier
-        if "uploaded_file_identifier" not in st.session_state or st.session_state.uploaded_file_identifier != file_identifier:
-            print(f"Processing uploaded file {session_uuid}")
-            document_text = parse_pdf(uploaded_file)
-            text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-            texts = text_splitter.create_documents([document_text])
-
-            db = Chroma.from_documents(texts, embeddings)
-            st.sidebar.success('המסמך נטען בהצלחה!')
-            st.session_state["chat_history"] = []
-            # Update the session state with the new file identifier
-            st.session_state.uploaded_file_identifier = file_identifier
-            return db.as_retriever(search_kwargs={"k": 4})
-
-    return None
-
+                db = Chroma.from_documents(texts, embeddings)
+                st.sidebar.success('המסמך נטען בהצלחה!')
+                st.session_state["chat_history"] = []
+                # Update the session state with the new file identifier
+                st.session_state.uploaded_file_identifier = file_identifier
+                return db.as_retriever(search_kwargs={"k": 4})
+        except Exception as e:
+            st.sidebar.error(f'Failed to process document: {e}')
+            return None
 
 # Function to handle fast questions from session state
 def check_and_handle_fast_question():
@@ -153,8 +151,6 @@ def setup_ui():
         retriever = process_uploaded_file(uploaded_file, st.session_state.session_id)
         if retriever:
             update_session_state(retriever, uploaded_file)
-        else:
-            st.sidebar.error('Failed to process document.')
 
     if st.session_state.show_initial_message:
         st.chat_message("assistant").markdown(
