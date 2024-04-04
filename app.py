@@ -21,7 +21,7 @@ PDF_FILE_TYPE = 'pdf'
 FAST_QUESTIONS = [
     "מי הם הצדדים במסמך שצירפתי לך?",
     "הכן לי תמצית של המסמך המצורף",
-    "מי התובע ומי הנתבע במסמך שצירפתי לך?"
+    "על איזה סכומים מדובר במסמך שצירפתי לך?",
 ]
 if "chat_history" not in st.session_state:
     st.session_state["chat_history"] = []
