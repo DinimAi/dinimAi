@@ -1,6 +1,5 @@
 import os
 import uuid
-import hmac
 from dotenv import load_dotenv, find_dotenv
 import streamlit as st
 from PyPDF2 import PdfReader
@@ -13,8 +12,9 @@ from langchain_anthropic import ChatAnthropic
 from langchain_community.embeddings import AzureOpenAIEmbeddings
 from langchain.chains import ConversationalRetrievalChain
 from genai.prompt import CHAIN_TEMPLATE
+import streamlit_authenticator as stauth
+import yaml
 
-# Constants for Streamlit page configuration
 PAGE_TITLE = 'DinimAi'
 PAGE_ICON = '📚'
 PDF_FILE_TYPE = 'pdf'
@@ -23,96 +23,22 @@ FAST_QUESTIONS = [
     "הכן לי תמצית של המסמך המצורף",
     "על איזה סכומים מדובר במסמך שצירפתי לך?",
 ]
-if "chat_history" not in st.session_state:
-    st.session_state["chat_history"] = []
-
 # Load environment variables
 load_dotenv(find_dotenv())
 st.set_page_config(page_title=PAGE_TITLE, page_icon=PAGE_ICON)
-st.markdown("""
-    <style>
-    /* Custom CSS for RTL alignment */
-    .stTextInput>div>div>input, .st-bf, .st-bj, .st-bu, .stButton>button, .stFileUploader, 
-    .stTextArea>div>div>textarea, .stMarkdown, .streamlit-alert {
-        direction: rtl;
-    }
-    .css-hi6a2p, h1 {
-        text-align: center;
-        direction: rtl;
-    }
-    label[data-baseweb="file-uploader"], .st-sl, .st-cb, .st-dd {
-        justify-content: flex-end;
-    }
-    .stSelectbox>div>div, .stMultiSelect>div>div>div {
-        direction: rtl;
-    }
-    .stButton>button {
-        justify-content: right;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
-def check_password():
-    """Returns `True` if the user had the correct password."""
-
-    def password_entered():
-        """Checks whether a password entered by the user is correct."""
-        if hmac.compare_digest(st.session_state["password"], st.secrets["password"]):
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Don't store the password.
-        else:
-            st.session_state["password_correct"] = False
-
-    # Return True if the password is validated.
-    if st.session_state.get("password_correct", False):
-        return True
-
-    # Show input for password.
-    st.text_input(
-        "Password", type="password", on_change=password_entered, key="password"
-    )
-    if "password_correct" in st.session_state:
-        st.error("😕 Password incorrect")
-    return False
-
-
-if not check_password():
-    st.stop()
-
-
-def initialize_embeddings_and_llm():
-    return AzureOpenAIEmbeddings(
-        azure_deployment=os.getenv('AZURE_EMBEDDING_DEPLOYMENT'),
-        openai_api_version=os.getenv('OPEN_AI_API_VER'),
-        openai_api_key=os.getenv('OPENAI_API_KEY'),
-        azure_endpoint=os.getenv('AZURE_ENDPOINT')
-    ), AzureChatOpenAI(
-        deployment_name=os.getenv('AZURE_MODEL_DEPLOYMENT'),
-        openai_api_version=os.getenv('OPEN_AI_API_VER'),
-        openai_api_key=os.getenv('OPENAI_API_KEY'),
-        azure_endpoint=os.getenv('AZURE_ENDPOINT'),
-        max_tokens=4096
-    )
-
-
-embeddings, llm = initialize_embeddings_and_llm()
-
-claude_llm = ChatAnthropic(
-    anthropic_api_key=os.getenv('ANTHROPIC_API_KEY'),
-    temperature=0,
-    model_name="claude-3-opus-20240229",
-    streaming=True
+with open('config.yaml', 'r') as file:
+    config = yaml.safe_load(file)
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days'],
+    config['preauthorized']
 )
-
-memory = ConversationBufferMemory(
-    memory_key="chat_history",
-    input_key='question',
-    output_key='answer',
-    return_messages=True
-)
+name, authentication_status, username = authenticator.login(fields=['username', 'password'])
 
 
-# Function to parse PDF content
 def parse_pdf(uploaded_file):
     reader = PdfReader(uploaded_file)
     text = ''.join([page.extract_text() + '\n' for page in reader.pages])
@@ -135,7 +61,6 @@ def generate_response(query_text, retriever):
     return chain({"question": query_text})["answer"]
 
 
-# Function to process uploaded PDF file
 def process_uploaded_file(uploaded_file, session_uuid):
     if uploaded_file:
         try:
@@ -149,22 +74,20 @@ def process_uploaded_file(uploaded_file, session_uuid):
                 db = Chroma.from_documents(texts, embeddings)
                 st.sidebar.success('המסמך נטען בהצלחה!')
                 st.session_state["chat_history"] = []
-                # Update the session state with the new file identifier
                 st.session_state.uploaded_file_identifier = file_identifier
                 return db.as_retriever(search_kwargs={"k": 4})
         except Exception as e:
             st.sidebar.error(f'Failed to process document: {e}')
             return None
 
-# Function to handle fast questions from session state
+
 def check_and_handle_fast_question():
     fast_question = st.session_state.get("fast_question", "")
     st.session_state["fast_question"] = ""
     return fast_question if fast_question else None
 
 
-# Main UI setup
-def setup_ui():
+def setup():
     if "show_initial_message" not in st.session_state:
         st.session_state.show_initial_message = True
 
@@ -206,6 +129,7 @@ def chat_history_display():
         elif role == "assistant":
             st.chat_message("assistant").markdown(content)
 
+
 def handle_fast_question():
     if "retriever" in st.session_state:
         st.chat_message("assistant").markdown("קראתי את המסמך! אתה יכול לשאול אותי שאלות עכשיו")
@@ -215,7 +139,8 @@ def handle_fast_question():
                 if st.button(FAST_QUESTIONS[idx]):
                     st.session_state["fast_question"] = FAST_QUESTIONS[idx]
 
-def main():
+
+def run_app():
     # Check if a retriever is created and if the user hasn't submitted a prompt
     if "retriever" in st.session_state and not "user_submitted_prompt" in st.session_state:
         st.session_state.show_initial_message = False
@@ -227,6 +152,7 @@ def main():
     if fast_question:
         handle_chat(fast_question)
 
+
 def handle_chat(prompt):
     chat_history_display()
     st.chat_message("user").markdown(prompt)
@@ -237,6 +163,7 @@ def handle_chat(prompt):
         display_response(prompt)
     st.session_state.user_submitted_prompt = True
 
+
 def display_initial_message():
     response = "אנא הכנס מסמך כדי שאוכל לעזור לך."  # Please upload a document so I can assist you.
     with st.chat_message("assistant"):
@@ -246,12 +173,76 @@ def display_initial_message():
 
 def display_response(prompt):
     with st.chat_message("assistant"):
-        tmp = st.markdown(f"אני חושב וכבר מחזיר לך תשובה...")  # I'm thinking and will get back to you with an answer...
+        tmp = st.markdown(
+            f"אני חושב וכבר מחזיר לך תשובה...")  # I'm thinking and will get back to you with an answer...
         response = generate_response(prompt, st.session_state.retriever)
         tmp.markdown(response)
         st.session_state.chat_history.append({"role": "assistant", "content": response})
 
+def initialize_embeddings_and_llm():
+        return AzureOpenAIEmbeddings(
+            azure_deployment=os.getenv('AZURE_EMBEDDING_DEPLOYMENT'),
+            openai_api_version=os.getenv('OPEN_AI_API_VER'),
+            openai_api_key=os.getenv('OPENAI_API_KEY'),
+            azure_endpoint=os.getenv('AZURE_ENDPOINT')
+        ), AzureChatOpenAI(
+            deployment_name=os.getenv('AZURE_MODEL_DEPLOYMENT'),
+            openai_api_version=os.getenv('OPEN_AI_API_VER'),
+            openai_api_key=os.getenv('OPENAI_API_KEY'),
+            azure_endpoint=os.getenv('AZURE_ENDPOINT'),
+            max_tokens=4096
+        )
 
-if __name__ == "__main__":
-    setup_ui()
-    main()
+
+if authentication_status:
+
+    st.markdown("""
+        <style>
+        /* Custom CSS for RTL alignment */
+        .stTextInput>div>div>input, .st-bf, .st-bj, .st-bu, .stButton>button, .stFileUploader, 
+        .stTextArea>div>div>textarea, .stMarkdown, .streamlit-alert {
+            direction: rtl;
+        }
+        .css-hi6a2p, h1 {
+            text-align: center;
+            direction: rtl;
+        }
+        label[data-baseweb="file-uploader"], .st-sl, .st-cb, .st-dd {
+            justify-content: flex-end;
+        }
+        .stSelectbox>div>div, .stMultiSelect>div>div>div {
+            direction: rtl;
+        }
+        .stButton>button {
+            justify-content: right;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    if "chat_history" not in st.session_state:
+        st.session_state["chat_history"] = []
+
+    claude_llm = ChatAnthropic(
+        anthropic_api_key=os.getenv('ANTHROPIC_API_KEY'),
+        temperature=0,
+        model_name="claude-3-opus-20240229",
+        streaming=True
+    )
+
+    memory = ConversationBufferMemory(
+        memory_key="chat_history",
+        input_key='question',
+        output_key='answer',
+        return_messages=True
+    )
+
+    embeddings, llm = initialize_embeddings_and_llm()
+
+    setup()
+    run_app()
+
+
+elif not authentication_status:
+    st.error('Username/password is incorrect')
+elif authentication_status is None:
+    st.warning('Please enter your username and password')

@@ -1,0 +1,21 @@
+credentials:
+  usernames:
+    maor:
+      email: maor@gmail.com
+      name: Maor
+      password: Maor123!
+    alex:
+      email: alex@gmail.com
+      name: Alex
+      password: Alex123!
+    hagay:
+      email: hagay@gmail.com
+      name: Hagay
+      password: Hagay123!
+cookie:
+  expiry_days: 30
+  key: your_random_signature_key
+  name: your_cookie_name
+preauthorized:
+  emails:
+    - ahuvim5@gmail.com
