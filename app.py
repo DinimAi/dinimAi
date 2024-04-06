@@ -1,5 +1,7 @@
 import os
 import uuid
+from pathlib import Path
+
 from dotenv import load_dotenv, find_dotenv
 import streamlit as st
 from PyPDF2 import PdfReader
@@ -23,6 +25,7 @@ FAST_QUESTIONS = [
     "הכן לי תמצית של המסמך המצורף",
     "על איזה סכומים מדובר במסמך שצירפתי לך?",
 ]
+LOCAL_VECTOR_STORE_DIR = Path(__file__).resolve().parent.joinpath('data', 'vector_store')
 # Load environment variables
 load_dotenv(find_dotenv())
 st.set_page_config(page_title=PAGE_TITLE, page_icon=PAGE_ICON)
@@ -71,7 +74,8 @@ def process_uploaded_file(uploaded_file, session_uuid):
                 text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
                 texts = text_splitter.create_documents([document_text])
 
-                db = Chroma.from_documents(texts, embeddings)
+                db = Chroma.from_documents(texts, embeddings,
+                                           persist_directory=LOCAL_VECTOR_STORE_DIR.as_posix()+f'/{file_identifier.split(".")[0]}')
                 st.sidebar.success('המסמך נטען בהצלחה!')
                 st.session_state["chat_history"] = []
                 st.session_state.uploaded_file_identifier = file_identifier
