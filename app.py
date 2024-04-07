@@ -55,13 +55,17 @@ def generate_response(query_text, retriever):
         template=CHAIN_TEMPLATE,
         input_variables=["context", "chat_history", "question"])
     chain = ConversationalRetrievalChain.from_llm(
-        llm=claude_llm,
+        llm=llm,
         memory=memory,
         combine_docs_chain_kwargs={"prompt": prompt},
         return_generated_question=True,
         retriever=retriever,
     )
-    return chain({"question": query_text})["answer"]
+    response = chain.invoke(
+        {"question": query_text,
+         "chat_history": st.session_state["chat_history"]
+         })
+    return response
 
 
 def process_uploaded_file(uploaded_file, session_uuid):
@@ -127,11 +131,10 @@ def display_fast_questions():
 
 def chat_history_display():
     for item in st.session_state.chat_history:
-        role, content = item["role"], item["content"]
-        if role == "user":
-            st.chat_message("user").markdown(content)
-        elif role == "assistant":
-            st.chat_message("assistant").markdown(content)
+        if item.type == "human":
+            st.chat_message("user").markdown(item.content)
+        elif item.type == "ai":
+            st.chat_message("assistant").markdown(item.content)
 
 
 def handle_fast_question():
@@ -160,7 +163,6 @@ def run_app():
 def handle_chat(prompt):
     chat_history_display()
     st.chat_message("user").markdown(prompt)
-    st.session_state.chat_history.append({"role": "user", "content": prompt})
     if not st.session_state.get('llm_ready', False):
         display_initial_message()
     else:
@@ -172,7 +174,6 @@ def display_initial_message():
     response = "אנא הכנס מסמך כדי שאוכל לעזור לך."  # Please upload a document so I can assist you.
     with st.chat_message("assistant"):
         st.markdown(response)
-    st.session_state.chat_history.append({"role": "assistant", "content": response})
 
 
 def display_response(prompt):
@@ -180,8 +181,9 @@ def display_response(prompt):
         tmp = st.markdown(
             f"אני חושב וכבר מחזיר לך תשובה...")  # I'm thinking and will get back to you with an answer...
         response = generate_response(prompt, st.session_state.retriever)
-        tmp.markdown(response)
-        st.session_state.chat_history.append({"role": "assistant", "content": response})
+        tmp.markdown(response['answer'])
+        st.session_state.chat_history += response['chat_history']
+
 
 def initialize_embeddings_and_llm():
         return AzureOpenAIEmbeddings(
