@@ -1,10 +1,10 @@
 import os
 import uuid
+import yaml
 from pathlib import Path
-
 from dotenv import load_dotenv, find_dotenv
 import streamlit as st
-from PyPDF2 import PdfReader
+
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores import Chroma
 from langchain.memory import ConversationBufferMemory
@@ -15,11 +15,11 @@ from langchain_community.embeddings import AzureOpenAIEmbeddings
 from langchain.chains import ConversationalRetrievalChain
 from genai.prompt import CHAIN_TEMPLATE
 import streamlit_authenticator as stauth
-import yaml
+
+from file_parser import FileParser
 
 PAGE_TITLE = 'DinimAi'
 PAGE_ICON = '📚'
-PDF_FILE_TYPE = 'pdf'
 FAST_QUESTIONS = [
     "מי הם הצדדים במסמך שצירפתי לך?",
     "הכן לי תמצית של המסמך המצורף",
@@ -41,11 +41,6 @@ authenticator = stauth.Authenticate(
 )
 name, authentication_status, username = authenticator.login(fields=['username', 'password'])
 
-
-def parse_pdf(uploaded_file):
-    reader = PdfReader(uploaded_file)
-    text = ''.join([page.extract_text() + '\n' for page in reader.pages])
-    return text
 
 
 # Function to generate response using the ConversationalRetrievalChain
@@ -70,7 +65,7 @@ def process_uploaded_file(uploaded_file, session_uuid):
             file_identifier = uploaded_file.name
             if "uploaded_file_identifier" not in st.session_state or st.session_state.uploaded_file_identifier != file_identifier:
                 print(f"Processing uploaded file {session_uuid}")
-                document_text = parse_pdf(uploaded_file)
+                document_text = FileParser.load(uploaded_file)
                 text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
                 texts = text_splitter.create_documents([document_text])
 
@@ -108,7 +103,7 @@ def setup():
         st.session_state.chat_memory = memory
 
     st.sidebar.image("logo.png", width=250)
-    uploaded_file = st.sidebar.file_uploader("Upload your PDF File", type=PDF_FILE_TYPE, label_visibility="hidden")
+    uploaded_file = st.sidebar.file_uploader("Upload your PDF File", type=FileParser.FILE_TYPES, label_visibility="hidden")
     if uploaded_file:
         retriever = process_uploaded_file(uploaded_file, st.session_state.session_id)
         if retriever:
