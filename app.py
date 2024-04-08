@@ -56,7 +56,7 @@ def generate_response(query_text, retriever):
         input_variables=["context", "chat_history", "question"])
     chain = ConversationalRetrievalChain.from_llm(
         llm=claude_llm,
-        memory=memory,
+        memory=st.session_state.chat_memory,
         combine_docs_chain_kwargs={"prompt": prompt},
         return_generated_question=True,
         retriever=retriever,
@@ -97,6 +97,15 @@ def setup():
 
     if "session_id" not in st.session_state:
         st.session_state.session_id = uuid.uuid4()
+
+    if "chat_memory" not in st.session_state:
+        memory = ConversationBufferMemory(
+            memory_key="chat_history",
+            input_key='question',
+            output_key='answer',
+            return_messages=True
+        )
+        st.session_state.chat_memory = memory
 
     st.sidebar.image("logo.png", width=250)
     uploaded_file = st.sidebar.file_uploader("Upload your PDF File", type=PDF_FILE_TYPE, label_visibility="hidden")
@@ -232,14 +241,6 @@ if authentication_status:
         model_name="claude-3-opus-20240229",
         streaming=True
     )
-
-    memory = ConversationBufferMemory(
-        memory_key="chat_history",
-        input_key='question',
-        output_key='answer',
-        return_messages=True
-    )
-
     embeddings, llm = initialize_embeddings_and_llm()
 
     setup()
