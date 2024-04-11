@@ -35,9 +35,10 @@ class FileParser:
 
     @classmethod
     def load(cls, uploaded_file):
-        file_type = uploaded_file.name.split('.')[-1]
+        file_type = uploaded_file.split('/')[-1].split('.')[-1]
         if file_type not in cls.PARSERS:
             raise Exception(f"File type {file_type} not supported")
 
-        return cls.PARSERS[file_type]().parse(uploaded_file)
+        with open(uploaded_file, 'rb') as uploaded_file:
+            return cls.PARSERS[file_type]().parse(uploaded_file)
 
