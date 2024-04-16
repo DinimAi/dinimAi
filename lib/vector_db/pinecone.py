@@ -1,10 +1,14 @@
 import logging
 import os
 from langchain_openai import AzureOpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceHubEmbeddings
 from langchain_community.vectorstores import Pinecone
 import pinecone
 from lib.vector_db import Database
 from lib.models.scrapedRawData import ScrapedRawMessageData
+import backoff
+import openai
 
 
 class PineconeDB(Database):
@@ -35,17 +39,18 @@ class PineconeDB(Database):
                              host=os.getenv("PINECONE_HOST_NAME",
                                             "https://dinim-ai-index-1ynzr5q.svc.gcp-starter.pinecone.io"))
             db = Pinecone(embedding=embeddings, index=index, text_key="articles")
+            # test ping pinecone
+            pc.list_indexes()
+
             logging.info("Successfully connected to Pinecone")
             return db
         except Exception as e:
-            logging.error("Error connecting to database: %s", e)
+            logging.error(f'Failed to connect to Pinecone: {e}')
 
+    @backoff.on_exception(backoff.expo, openai.RateLimitError)
     def insert(self, item: ScrapedRawMessageData):
         all_texts, all_metadata = item.create_text_and_metadata_lists()
-        try:
-            self.db.add_texts(all_texts, all_metadata)
-        except Exception as e:
-            logging.error("did not succeed to index due to %s", e)
+        self.db.add_texts(all_texts, all_metadata)
 
     def query(self, query):
         logging.info("will require impl in the future")

@@ -28,19 +28,22 @@ class PDFScraper:
 
     @staticmethod
     def parse_pdf(source):
-        document_text = FileParser.load(source)
+        document_text = FileParser.load_file(source)
         return document_text
 
     def scrape_and_index_single(self, source):
         try:
+
             text = self.parse_pdf(source)
             print(f"text extracted from {source}")
             court_record_id = source.split('/')[2]
-
+            if court_record_id == '1633-20':
+                print("skipping 1633-20")
+                return
             # Create a new database connection for each thread
-            db_connection = sqlite3.connect(self.db_path)
-            db_connection.row_factory = sqlite3.Row
-            cursor = db_connection.cursor()
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
 
             cursor.execute("SELECT is_scraped FROM court_records WHERE record_number = ?", (court_record_id,))
             is_scraped = cursor.fetchone()
@@ -51,19 +54,23 @@ class PDFScraper:
             cursor.execute("SELECT * FROM court_records WHERE record_number = ?", (court_record_id,))
             metadata_row = cursor.fetchone()
             metadata = dict(metadata_row) if metadata_row is not None else {}
+            cursor.execute("SELECT name, full_path FROM documents WHERE court_record_id = ?", (court_record_id,))
+            document_info = cursor.fetchone()
+            if document_info:
+                metadata['name'] = document_info['name']
+                metadata['source'] = document_info['full_path']
+            if 'is_scraped' in metadata:
+                del metadata['is_scraped']
             item = ScrapedRawMessageData(text=text, **metadata)
             print(f"Inserting {source} into vector db")
             self.vector_db.insert(item)
-            cursor.execute("UPDATE court_records SET is_scraped = 1 WHERE record_number = ?", (court_record_id,))
-            db_connection.commit()
-            db_connection.close()
             print(f"Scraped {source}")
         except Exception as ex:
-            print(f"Error scraping {source}: {ex}")
+            print(f"Error scraping {source}: {ex}, source: {source}")
 
     def scrape_and_index(self):
         with ThreadPoolExecutor(max_workers=20) as executor:
-            executor.map(self.scrape_and_index_single, self._sources)
+            executor.map(self.scrape_and_index_single, self._sources[200:])
 
     def run(self):
         self.get_sources()

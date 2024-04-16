@@ -4,7 +4,8 @@ import yaml
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 import streamlit as st
-
+from langchain.chains import LLMChain
+from lib.vector_db.pinecone import PineconeDB
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores import Chroma
 from langchain.memory import ConversationBufferMemory
@@ -13,6 +14,7 @@ from langchain_community.chat_models import AzureChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_community.embeddings import AzureOpenAIEmbeddings
 from langchain.chains import ConversationalRetrievalChain
+from langchain.chains.qa_with_sources.loading import load_qa_with_sources_chain
 from genai.prompt import CHAIN_TEMPLATE
 import streamlit_authenticator as stauth
 
@@ -42,21 +44,22 @@ authenticator = stauth.Authenticate(
 name, authentication_status, username = authenticator.login(fields=['username', 'password'])
 
 
-
 # Function to generate response using the ConversationalRetrievalChain
-def generate_response(query_text, retriever):
+def generate_response(query_text):
     print(f"Generating response to - {query_text}")
     prompt = PromptTemplate(
         template=CHAIN_TEMPLATE,
-        input_variables=["context", "chat_history", "question"])
+        input_variables=["context", "question"])
     chain = ConversationalRetrievalChain.from_llm(
-        llm=claude_llm,
+        llm=llm,
+        retriever=st.session_state.retriever,
         memory=st.session_state.chat_memory,
         combine_docs_chain_kwargs={"prompt": prompt},
         return_generated_question=True,
-        retriever=retriever,
-    )
-    return chain({"question": query_text})["answer"]
+        return_source_documents=True)
+    res = chain({"question": query_text, "context": "answer in Hebrew"})
+    print(res)
+    return res["answer"]
 
 
 def process_uploaded_file(uploaded_file, session_uuid):
@@ -67,10 +70,11 @@ def process_uploaded_file(uploaded_file, session_uuid):
                 print(f"Processing uploaded file {session_uuid}")
                 document_text = FileParser.load(uploaded_file)
                 text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-                texts = text_splitter.create_documents([document_text])
+                texts = text_splitter.create_documents([document_text], metadatas=[{"source": file_identifier}])
+                # add metadata to the text
 
                 db = Chroma.from_documents(texts, embeddings,
-                                           persist_directory=LOCAL_VECTOR_STORE_DIR.as_posix()+f'/{file_identifier.split(".")[0]}')
+                                           persist_directory=LOCAL_VECTOR_STORE_DIR.as_posix() + f'/{file_identifier.split(".")[0]}')
                 st.sidebar.success('המסמך נטען בהצלחה!')
                 st.session_state["chat_history"] = []
                 st.session_state.uploaded_file_identifier = file_identifier
@@ -78,6 +82,12 @@ def process_uploaded_file(uploaded_file, session_uuid):
         except Exception as e:
             st.sidebar.error(f'Failed to process document: {e}')
             return None
+
+
+def initialize_vector_db_retriever():
+    vector_db = PineconeDB()
+    return vector_db.db.as_retriever(search_type="similarity_score_threshold",
+                                     search_kwargs={"score_threshold": .9, "k": 3})
 
 
 def check_and_handle_fast_question():
@@ -103,11 +113,23 @@ def setup():
         st.session_state.chat_memory = memory
 
     st.sidebar.image("logo.png", width=250)
-    uploaded_file = st.sidebar.file_uploader("Upload your PDF File", type=FileParser.FILE_TYPES, label_visibility="hidden")
-    if uploaded_file:
-        retriever = process_uploaded_file(uploaded_file, st.session_state.session_id)
+    data_source = st.sidebar.radio(
+        "A",
+        ('העלה מסמך משלך', 'השתמש במסד נתונים טעון'), label_visibility="hidden"
+    )
+
+    if data_source == 'העלה מסמך משלך':
+        uploaded_file = st.sidebar.file_uploader("Upload your PDF file", type=FileParser.FILE_TYPES,
+                                                 label_visibility="hidden")
+        if uploaded_file:
+            retriever = process_uploaded_file(uploaded_file, st.session_state.session_id)
+            if retriever:
+                update_session_state(retriever, uploaded_file)
+    else:
+        retriever = initialize_vector_db_retriever()
         if retriever:
-            update_session_state(retriever, uploaded_file)
+            update_session_state(retriever, 'Pinecone')
+        st.sidebar.success("התחברות למסד הנתונים הסתיימה בהצלחה!")
 
     if st.session_state.show_initial_message:
         st.chat_message("assistant").markdown(
@@ -139,7 +161,7 @@ def chat_history_display():
 
 
 def handle_fast_question():
-    if "retriever" in st.session_state:
+    if "retriever" in st.session_state and not st.session_state.uploaded_file == 'Pinecone':
         st.chat_message("assistant").markdown("קראתי את המסמך! אתה יכול לשאול אותי שאלות עכשיו")
         cols = st.columns(len(FAST_QUESTIONS))
         for idx, col in enumerate(cols):
@@ -183,23 +205,24 @@ def display_response(prompt):
     with st.chat_message("assistant"):
         tmp = st.markdown(
             f"אני חושב וכבר מחזיר לך תשובה...")  # I'm thinking and will get back to you with an answer...
-        response = generate_response(prompt, st.session_state.retriever)
+        response = generate_response(prompt)
         tmp.markdown(response)
         st.session_state.chat_history.append({"role": "assistant", "content": response})
 
+
 def initialize_embeddings_and_llm():
-        return AzureOpenAIEmbeddings(
-            azure_deployment=os.getenv('AZURE_EMBEDDING_DEPLOYMENT'),
-            openai_api_version=os.getenv('OPEN_AI_API_VER'),
-            openai_api_key=os.getenv('OPENAI_API_KEY'),
-            azure_endpoint=os.getenv('AZURE_ENDPOINT')
-        ), AzureChatOpenAI(
-            deployment_name=os.getenv('AZURE_MODEL_DEPLOYMENT'),
-            openai_api_version=os.getenv('OPEN_AI_API_VER'),
-            openai_api_key=os.getenv('OPENAI_API_KEY'),
-            azure_endpoint=os.getenv('AZURE_ENDPOINT'),
-            max_tokens=4096
-        )
+    return AzureOpenAIEmbeddings(
+        azure_deployment=os.getenv('AZURE_EMBEDDING_DEPLOYMENT'),
+        openai_api_version=os.getenv('OPEN_AI_API_VER'),
+        openai_api_key=os.getenv('OPENAI_API_KEY'),
+        azure_endpoint=os.getenv('AZURE_ENDPOINT')
+    ), AzureChatOpenAI(
+        deployment_name=os.getenv('AZURE_MODEL_DEPLOYMENT'),
+        openai_api_version=os.getenv('OPEN_AI_API_VER'),
+        openai_api_key=os.getenv('OPENAI_API_KEY'),
+        azure_endpoint=os.getenv('AZURE_ENDPOINT'),
+        max_tokens=4096
+    )
 
 
 if authentication_status:
