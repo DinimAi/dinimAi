@@ -51,13 +51,13 @@ def generate_response(query_text):
         template=CHAIN_TEMPLATE,
         input_variables=["context", "question"])
     chain = ConversationalRetrievalChain.from_llm(
-        llm=llm,
+        llm=claude_llm,
         retriever=st.session_state.retriever,
         memory=st.session_state.chat_memory,
         combine_docs_chain_kwargs={"prompt": prompt},
         return_generated_question=True,
         return_source_documents=True)
-    res = chain({"question": query_text, "context": "answer in Hebrew"})
+    res = chain({"question": query_text})
     print(res)
     return res["answer"]
 
@@ -66,7 +66,8 @@ def process_uploaded_file(uploaded_file, session_uuid):
     if uploaded_file:
         try:
             file_identifier = uploaded_file.name
-            if "uploaded_file_identifier" not in st.session_state or st.session_state.uploaded_file_identifier != file_identifier:
+            if ("uploaded_file_identifier" not in st.session_state or
+                    st.session_state.uploaded_file_identifier != file_identifier):
                 print(f"Processing uploaded file {session_uuid}")
                 document_text = FileParser.load(uploaded_file)
                 text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
@@ -78,7 +79,7 @@ def process_uploaded_file(uploaded_file, session_uuid):
                 st.sidebar.success('המסמך נטען בהצלחה!')
                 st.session_state["chat_history"] = []
                 st.session_state.uploaded_file_identifier = file_identifier
-                return db.as_retriever(search_kwargs={"k": 4})
+                return db.as_retriever(search_kwargs={"k": 2})
         except Exception as e:
             st.sidebar.error(f'Failed to process document: {e}')
             return None
@@ -87,7 +88,7 @@ def process_uploaded_file(uploaded_file, session_uuid):
 def initialize_vector_db_retriever():
     vector_db = PineconeDB()
     return vector_db.db.as_retriever(search_type="similarity_score_threshold",
-                                     search_kwargs={"score_threshold": .9, "k": 3})
+                                     search_kwargs={"score_threshold": .9, "k": 5})
 
 
 def check_and_handle_fast_question():
@@ -221,7 +222,7 @@ def initialize_embeddings_and_llm():
         openai_api_version=os.getenv('OPEN_AI_API_VER'),
         openai_api_key=os.getenv('OPENAI_API_KEY'),
         azure_endpoint=os.getenv('AZURE_ENDPOINT'),
-        max_tokens=4096
+        max_tokens=1024
     )
 
 
@@ -257,7 +258,8 @@ if authentication_status:
         anthropic_api_key=os.getenv('ANTHROPIC_API_KEY'),
         temperature=0,
         model_name="claude-3-opus-20240229",
-        streaming=True
+        streaming=True,
+        max_tokens=1024
     )
     embeddings, llm = initialize_embeddings_and_llm()
 

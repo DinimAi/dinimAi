@@ -27,11 +27,13 @@ class PineconeDB(Database):
     def connect(self):
         try:
             logging.info("Connecting to Pinecone")
+            hosted_embeddings = HuggingFaceHubEmbeddings(model="http://99.80.102.238:8080")
             embeddings = AzureOpenAIEmbeddings(
                 azure_deployment=os.environ.get('AZURE_EMBEDDING_DEPLOYMENT'),
                 openai_api_version=os.environ.get('OPEN_AI_API_VER'),
                 openai_api_key=os.environ.get('OPENAI_API_KEY'),
                 azure_endpoint=os.environ.get('AZURE_ENDPOINT')
+
             )
             logging.info("Connecting to Pinecone")
             pc = pinecone.Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
@@ -39,7 +41,6 @@ class PineconeDB(Database):
                              host=os.getenv("PINECONE_HOST_NAME",
                                             "https://dinim-ai-index-1ynzr5q.svc.gcp-starter.pinecone.io"))
             db = Pinecone(embedding=embeddings, index=index, text_key="articles")
-            # test ping pinecone
             pc.list_indexes()
 
             logging.info("Successfully connected to Pinecone")
@@ -49,8 +50,8 @@ class PineconeDB(Database):
 
     @backoff.on_exception(backoff.expo, openai.RateLimitError)
     def insert(self, item: ScrapedRawMessageData):
-        all_texts, all_metadata = item.create_text_and_metadata_lists()
-        self.db.add_texts(all_texts, all_metadata)
+        docs = item.create_text_and_metadata_lists()
+        self.db.add_documents(docs)
 
     def query(self, query):
         logging.info("will require impl in the future")

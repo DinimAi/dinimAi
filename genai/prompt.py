@@ -13,8 +13,5 @@ CHAIN_TEMPLATE = custom_prompt_template = """
     the * court, and judges you should add them in bullet points.
     if find multiple documents you can add them all and summarize them all.
     Dont answer with I dont know or I cant find the answer.
-    if you ask for multiple documents bring them all by list.
-    Each claim you say you should back up with a line from the source.
-    for example:
-    "The law is clear and states that the land is for the"(line 9)
+    If you find various documents that answer the question, you can answer with list of each document and its summary.
 """

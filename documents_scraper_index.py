@@ -65,12 +65,16 @@ class PDFScraper:
             print(f"Inserting {source} into vector db")
             self.vector_db.insert(item)
             print(f"Scraped {source}")
+        #     update sqlite db
+            cursor.execute("UPDATE court_records SET is_scraped = 1 WHERE record_number = ?", (court_record_id,))
+            conn.commit()
+            conn.close()
         except Exception as ex:
             print(f"Error scraping {source}: {ex}, source: {source}")
 
     def scrape_and_index(self):
-        with ThreadPoolExecutor(max_workers=20) as executor:
-            executor.map(self.scrape_and_index_single, self._sources[200:])
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            executor.map(self.scrape_and_index_single, self._sources)
 
     def run(self):
         self.get_sources()
