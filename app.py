@@ -259,7 +259,7 @@ if authentication_status:
         temperature=0,
         model_name="claude-3-opus-20240229",
         streaming=True,
-        max_tokens=1024
+        max_tokens=4096
     )
     embeddings, llm = initialize_embeddings_and_llm()
 
