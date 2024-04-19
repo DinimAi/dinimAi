@@ -88,7 +88,7 @@ def process_uploaded_file(uploaded_file, session_uuid):
 def initialize_vector_db_retriever():
     vector_db = PineconeDB()
     return vector_db.db.as_retriever(search_type="similarity_score_threshold",
-                                     search_kwargs={"score_threshold": .9, "k": 5})
+                                     search_kwargs={"score_threshold": .9, "k": 50})
 
 
 def check_and_handle_fast_question():
@@ -196,7 +196,7 @@ def handle_chat(prompt):
 
 
 def display_initial_message():
-    response = "אנא הכנס מסמך כדי שאוכל לעזור לך."  # Please upload a document so I can assist you.
+    response = "אנא הכנס מסמך כדי שאוכל לעזור לך. או השתמש במסד הנתונים שלנו המכיל מגוון רחב של מסמכיים משפטיים"  # Please upload a document so I can assist you.
     with st.chat_message("assistant"):
         st.markdown(response)
     st.session_state.chat_history.append({"role": "assistant", "content": response})

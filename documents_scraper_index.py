@@ -41,7 +41,7 @@ class PDFScraper:
                 print("skipping 1633-20")
                 return
             # Create a new database connection for each thread
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=10)  # timeout in seconds
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -82,7 +82,7 @@ class PDFScraper:
 
 
 if __name__ == "__main__":
-    db_path = "./psikot_docs.db"
+    db_path = "./psikot_docs_1.db"
     vector_db = PineconeDB()
     scraper = PDFScraper(downloads_path="./downloads",
                          db_path=db_path,

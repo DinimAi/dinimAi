@@ -14,7 +14,7 @@ class ScrapedRawMessageData(object):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    def _split_text_to_chunks(self, chunk_size=1000, chunk_overlap=100):
+    def _split_text_to_chunks(self, chunk_size=2000, chunk_overlap=100):
         doc = Document(page_content=self.text, metadata={"source": "gov"})
         return RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap).split_documents([doc])
 
@@ -26,6 +26,6 @@ class ScrapedRawMessageData(object):
             chunk_metadata = base_metadata.copy()
             chunk_metadata['chunk_id'] = i
             chunk.metadata = chunk_metadata
-            chunk.page_content = str(chunk_metadata) + chunk.page_content
+            chunk.page_content = chunk.page_content + str(chunk_metadata)
 
         return chunks  # Return the list of chunks, each with its own metadata
