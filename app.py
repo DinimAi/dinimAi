@@ -4,7 +4,6 @@ import yaml
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 import streamlit as st
-from langchain.chains import LLMChain
 from lib.vector_db.pinecone import PineconeDB
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores import Chroma
@@ -14,7 +13,6 @@ from langchain_community.chat_models import AzureChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_community.embeddings import AzureOpenAIEmbeddings
 from langchain.chains import ConversationalRetrievalChain
-from langchain.chains.qa_with_sources.loading import load_qa_with_sources_chain
 from genai.prompt import CHAIN_TEMPLATE
 import streamlit_authenticator as stauth
 
