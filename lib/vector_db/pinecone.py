@@ -21,7 +21,7 @@ class PineconeDB(Database):
     @property
     def index_name(self):
         if not hasattr(self, '_index_name') or self._index_name is None:
-            self._index_name = os.getenv("PINECONE_INDEX_NAME", "embedding2")
+            self._index_name = os.getenv("PINECONE_INDEX_NAME", "dinim-ai-index")
         return self._index_name
 
     def connect(self):
@@ -39,7 +39,7 @@ class PineconeDB(Database):
             pc = pinecone.Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
             index = pc.Index(name=self.index_name,
                              host=os.getenv("PINECONE_HOST_NAME",
-                                            "https://dinim-ai-index-1ynzr5q.svc.gcp-starter.pinecone.io"))
+                                            "https://dinim-ai-index-1ynzr5q.svc.aped-4627-b74a.pinecone.io"))
             db = Pinecone(embedding=embeddings, index=index, text_key="articles")
             pc.list_indexes()
 
