@@ -27,13 +27,11 @@ class PineconeDB(Database):
     def connect(self):
         try:
             logging.info("Connecting to Pinecone")
-            hosted_embeddings = HuggingFaceHubEmbeddings(model="http://99.80.102.238:8080")
             embeddings = AzureOpenAIEmbeddings(
                 azure_deployment=os.environ.get('AZURE_EMBEDDING_DEPLOYMENT'),
                 openai_api_version=os.environ.get('OPEN_AI_API_VER'),
                 openai_api_key=os.environ.get('OPENAI_API_KEY'),
                 azure_endpoint=os.environ.get('AZURE_ENDPOINT')
-
             )
             logging.info("Connecting to Pinecone")
             pc = pinecone.Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
