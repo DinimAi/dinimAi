@@ -18,6 +18,12 @@ import streamlit_authenticator as stauth
 
 from file_parser import FileParser
 
+if os.environ.get('WITH_TRACING', None):
+    os.environ['LANGCHAIN_TRACING_V2'] = 'true'
+    os.environ['LANGCHAIN_ENDPOINT'] = 'https://api.smith.langchain.com'
+    os.environ['LANGCHAIN_API_KEY'] = 'ls__3cb9d2c28c2d4f7b89e32b201ad100fc'
+
+
 PAGE_TITLE = 'DinimAi'
 PAGE_ICON = '📚'
 FAST_QUESTIONS = [
