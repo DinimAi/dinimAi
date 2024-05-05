@@ -22,7 +22,7 @@ from file_parser import FileParser
 if os.environ.get('WITH_TRACING', None):
     os.environ['LANGCHAIN_TRACING_V2'] = 'true'
     os.environ['LANGCHAIN_ENDPOINT'] = 'https://api.smith.langchain.com'
-    os.environ['LANGCHAIN_API_KEY'] = 'ls__3cb9d2c28c2d4f7b89e32b201ad100fc'
+    #os.environ['LANGCHAIN_API_KEY'] = 'ls__....'
 
 
 PAGE_TITLE = 'DinimAi'
@@ -49,8 +49,24 @@ authenticator = stauth.Authenticate(
 name, authentication_status, username = authenticator.login(fields=['username', 'password'])
 
 
+def is_hebrew(input_sentence):
+    # Unicode range for Hebrew characters is U+0590 to U+05FF
+    return any('\u0590' <= char <= '\u05FF' for char in input_sentence)
+
+
+def is_less_than_three_words(input_sentence, min_num_words=3):
+    # Split the sentence into words based on spaces
+    words = input_sentence.split()
+    # Check if the number of words is less than 3
+    return len(words) < min_num_words
+
+
 # Function to generate response using the ConversationalRetrievalChain
 def generate_response(query_text):
+
+    if is_less_than_three_words(query_text) or not is_hebrew(query_text):
+        return "שאלה קצרה מדיי או לא בעברית"
+
     print(f"Generating response to - {query_text}")
     prompt = PromptTemplate(
         template=CHAIN_TEMPLATE,
@@ -259,16 +275,16 @@ if authentication_status:
     if "chat_history" not in st.session_state:
         st.session_state["chat_history"] = []
 
-    claude_llm = ChatOllama(model='llama3', temperature=0, max_tokens=4096)
+    # claude_llm = ChatOllama(model='llama3', temperature=0, max_tokens=4096)
 
-    # claude_llm = ChatAnthropic(
-    #     anthropic_api_key=os.getenv('ANTHROPIC_API_KEY'),
-    #     temperature=0,
-    #     model_name="claude-3-opus-20240229",
-    #     streaming=True,
-    #     max_tokens=4096,
-    #     verbose=True,
-    # )
+    claude_llm = ChatAnthropic(
+        anthropic_api_key=os.getenv('ANTHROPIC_API_KEY'),
+        temperature=0,
+        model_name="claude-3-opus-20240229",
+        streaming=True,
+        max_tokens=4096,
+        verbose=True,
+    )
     embeddings, llm = initialize_embeddings_and_llm()
 
     setup()
