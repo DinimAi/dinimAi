@@ -109,7 +109,7 @@ def process_uploaded_file(uploaded_file, session_uuid):
 def initialize_vector_db_retriever():
     vector_db = PineconeDB()
     return vector_db.db.as_retriever(search_type="similarity_score_threshold",
-                                     search_kwargs={"score_threshold": .9, "k": 50})
+                                     search_kwargs={"score_threshold": .9, "k": 10})
 
 
 def check_and_handle_fast_question():

@@ -5,7 +5,7 @@ CHAIN_TEMPLATE = custom_prompt_template = """
     Follow Up Input: {question}
     You are expert in legal issues! start by answering the question in Hebrew language!
     you must answer in Hebrew language!
-
+    Don't return source from the text content - only from the metadata source url [source]
     example 1:
     if the user say: "Could you find me a documents that explain the law of the land in or talks about the" האם תוכל למצוא לי פסק דין
     "Yes and summary of the document is: "bla bla bla"
