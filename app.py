@@ -10,13 +10,11 @@ from langchain.vectorstores import Chroma
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import PromptTemplate
 from langchain_community.chat_models import AzureChatOpenAI
-from langchain_anthropic import ChatAnthropic
 from langchain_community.embeddings import AzureOpenAIEmbeddings
 from langchain.chains import ConversationalRetrievalChain
 from genai.prompt import CHAIN_TEMPLATE
 import streamlit_authenticator as stauth
-from langchain_community.chat_models import ChatOllama
-
+from langchain_aws import ChatBedrock
 from file_parser import FileParser
 
 if os.environ.get('WITH_TRACING', None):
@@ -275,16 +273,12 @@ if authentication_status:
     if "chat_history" not in st.session_state:
         st.session_state["chat_history"] = []
 
-    # claude_llm = ChatOllama(model='llama3', temperature=0, max_tokens=4096)
-
-    claude_llm = ChatAnthropic(
-        anthropic_api_key=os.getenv('ANTHROPIC_API_KEY'),
-        temperature=0,
-        model_name="claude-3-opus-20240229",
-        streaming=True,
-        max_tokens=4096,
-        verbose=True,
+    claude_llm = ChatBedrock(
+        model_id="anthropic.claude-3-opus-20240229-v1:0",
+        model_kwargs={"temperature": 0},
+        credentials_profile_name=os.getenv('AWS_BEDROCK_PROFILE_NAME')
     )
+
     embeddings, llm = initialize_embeddings_and_llm()
 
     setup()
