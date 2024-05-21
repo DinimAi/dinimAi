@@ -31,9 +31,7 @@ docker build -t dinimai .
 Run the Docker container with your AWS credentials and configuration mounted. This step ensures that Dinim AI has access to necessary AWS resources.
 
 ```sh
-docker run -v ~/.aws/credentials:/root/.aws/credentials \
--v ~/.aws/config:/root/.aws/config \
-dinimai
+docker run -p 8501:8501 -v ~/.aws/credentials:/root/.aws/credentials -v ~/.aws/config:/root/.aws/config -d dinimai
 ```
 
 ## Usage
