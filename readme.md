@@ -27,6 +27,7 @@ Navigate to the project directory and build the Docker image.
 docker build -t dinimai .
 ```
 
+
 ### Step 3: Run the Docker Container
 Run the Docker container with your AWS credentials and configuration mounted. This step ensures that Dinim AI has access to necessary AWS resources.
 
